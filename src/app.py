@@ -13,8 +13,8 @@ utils.retrieve_config_from_agent()
 if "aws_credentials" not in st.session_state:
     st.session_state.aws_credentials = None
 
-st.set_page_config(page_title="Amazon Q Business Custom UI") #HTML title
-st.title("Amazon Q Business Custom UI") #page title
+st.set_page_config(page_title="Luminai App") #HTML title
+st.title("Luminai App") #page title
 
 # Define a function to clear the chat history
 def clear_chat_history():

@@ -170,3 +170,5 @@ cython_debug/
 local.md
 docs/arch.drawio
 reportliner.json
+
+logs.txt

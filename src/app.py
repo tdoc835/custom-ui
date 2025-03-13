@@ -78,19 +78,40 @@ else:
     with col2:
         st.button("Clear Chat History", on_click=clear_chat_history)
 
-    # Add a button to manually assume the AWS role for S3 access
-    if st.button("Assume AWS Role for S3 Access"):
-        if "idc_jwt_token" in st.session_state:
-            utils.assume_role_with_token(st.session_state["idc_jwt_token"]["idToken"])
-            st.success("AWS credentials populated!")
-        else:
-            st.error("No identity token available. Please log in first.")
+st.write("### Upload File to S3")
 
-    # --- S3 Bucket Access Check ---
-    st.write("### S3 Bucket Access Check")
-    if st.session_state.get("aws_credentials"):
+# Let the user choose a file to upload
+uploaded_file = st.file_uploader("Choose a file to upload")
+
+if uploaded_file:
+    # Calculate file size for progress reporting
+    file_size = len(uploaded_file.getbuffer())
+    progress_bar = st.progress(0)
+
+    # Create a callback class that updates the progress bar
+    class ProgressPercentage:
+        def __init__(self, total_size):
+            self._total_size = total_size
+            self._seen_so_far = 0
+
+        def __call__(self, bytes_amount):
+            self._seen_so_far += bytes_amount
+            percentage = int((self._seen_so_far / self._total_size) * 100)
+            progress_bar.progress(min(100, percentage))
+
+    progress = ProgressPercentage(file_size)
+
+    if st.button("Upload File"):
+        # Ensure AWS credentials are available.
+        if not st.session_state.get("aws_credentials"):
+            if "idc_jwt_token" in st.session_state:
+                # This call will assume the role and populate st.session_state.aws_credentials
+                utils.assume_role_with_token(st.session_state["idc_jwt_token"]["idToken"])
+            else:
+                st.error("No identity token available. Please log in first.")
+                st.stop()
         try:
-            # Use the keys as provided by assume_role_with_token: AccessKeyId, SecretAccessKey, and SessionToken
+            # Create the S3 client using the assumed role credentials.
             s3_client = boto3.client(
                 's3',
                 region_name='us-east-1',
@@ -98,18 +119,19 @@ else:
                 aws_secret_access_key=st.session_state.aws_credentials.get('SecretAccessKey'),
                 aws_session_token=st.session_state.aws_credentials.get('SessionToken')
             )
-            response = s3_client.list_objects_v2(Bucket='luminaitestbucket')
-            if 'Contents' in response:
-                bucket_contents = [obj['Key'] for obj in response['Contents']]
-                st.success("Connected to bucket. Contents:")
-                st.write(bucket_contents)
-            else:
-                st.success("Connected to bucket. Bucket is empty.")
+            # Ensure the file pointer is at the beginning
+            uploaded_file.seek(0)
+            s3_client.upload_fileobj(
+                Fileobj=uploaded_file,
+                Bucket="luminaitestbucket",
+                Key=uploaded_file.name,
+                Callback=progress
+            )
+            st.success("Upload complete!")
+        except ClientError as e:
+            st.error(f"Error uploading file: {e}")
         except Exception as e:
-            st.error(f"Error connecting to bucket: {e}")
-    else:
-        st.warning("AWS credentials are not available.")
-    # --- End S3 Bucket Access Check ---
+            st.error(f"Error uploading file: {e}")
 
     # Initialize the chat messages in the session state if it doesn't exist
     if "messages" not in st.session_state:

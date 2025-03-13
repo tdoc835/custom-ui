@@ -78,30 +78,45 @@ else:
     with col2:
         st.button("Clear Chat History", on_click=clear_chat_history)
 
-            # --- S3 Bucket Access Check ---
-    st.write("### S3 Bucket Access Check")
-    if st.session_state.aws_credentials:
-        try:
-            s3_client = boto3.client(
-                's3',
-                region_name='us-east-1',
-                aws_access_key_id=st.session_state.aws_credentials.get('aws_access_key_id'),
-                aws_secret_access_key=st.session_state.aws_credentials.get('aws_secret_access_key')
-            )
-            response = s3_client.list_objects_v2(Bucket='luminaitestbucket')
-            if 'Contents' in response:
-                bucket_contents = [obj['Key'] for obj in response['Contents']]
-                st.success("Connected to bucket. Contents:")
-                st.write(bucket_contents)
-            else:
-                st.success("Connected to bucket. Bucket is empty.")
-        except ClientError as e:
-            st.error(f"Error connecting to bucket: {e}")
-        except Exception as e:
-            st.error(f"Error connecting to bucket: {e}")
+ # After verifying the token and displaying the welcome message
+col1, col2 = st.columns([1, 1])
+with col1:
+    st.write("Welcome: ", user_email)
+with col2:
+    st.button("Clear Chat History", on_click=clear_chat_history)
+
+# Add a button to manually assume the AWS role for S3 access
+if st.button("Assume AWS Role for S3 Access"):
+    if "idc_jwt_token" in st.session_state:
+        utils.assume_role_with_token(st.session_state["idc_jwt_token"]["idToken"])
+        st.success("AWS credentials populated!")
     else:
-        st.warning("AWS credentials are not available.")
-    # --- End S3 Bucket Access Check ---
+        st.error("No identity token available. Please log in first.")
+
+# --- S3 Bucket Access Check ---
+st.write("### S3 Bucket Access Check")
+if st.session_state.get("aws_credentials"):
+    try:
+        # Use the keys as provided by assume_role_with_token: AccessKeyId, SecretAccessKey, and SessionToken
+        s3_client = boto3.client(
+            's3',
+            region_name='us-east-1',
+            aws_access_key_id=st.session_state.aws_credentials.get('AccessKeyId'),
+            aws_secret_access_key=st.session_state.aws_credentials.get('SecretAccessKey'),
+            aws_session_token=st.session_state.aws_credentials.get('SessionToken')
+        )
+        response = s3_client.list_objects_v2(Bucket='luminaitestbucket')
+        if 'Contents' in response:
+            bucket_contents = [obj['Key'] for obj in response['Contents']]
+            st.success("Connected to bucket. Contents:")
+            st.write(bucket_contents)
+        else:
+            st.success("Connected to bucket. Bucket is empty.")
+    except Exception as e:
+        st.error(f"Error connecting to bucket: {e}")
+else:
+    st.warning("AWS credentials are not available.")
+# --- End S3 Bucket Access Check ---
 
     # Initialize the chat messages in the session state if it doesn't exist
     if "messages" not in st.session_state:

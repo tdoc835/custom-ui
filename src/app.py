@@ -5,6 +5,8 @@ import jwt.algorithms
 import streamlit as st  #all streamlit commands will be available through the "st" alias
 import utils
 from streamlit_feedback import streamlit_feedback
+import boto3
+from botocore.exceptions import ClientError
 
 UTC=timezone.utc
 
@@ -75,6 +77,31 @@ else:
         st.write("Welcome: ", user_email)
     with col2:
         st.button("Clear Chat History", on_click=clear_chat_history)
+
+            # --- S3 Bucket Access Check ---
+    st.write("### S3 Bucket Access Check")
+    if st.session_state.aws_credentials:
+        try:
+            s3_client = boto3.client(
+                's3',
+                region_name='us-east-1',
+                aws_access_key_id=st.session_state.aws_credentials.get('aws_access_key_id'),
+                aws_secret_access_key=st.session_state.aws_credentials.get('aws_secret_access_key')
+            )
+            response = s3_client.list_objects_v2(Bucket='luminaitestbucket')
+            if 'Contents' in response:
+                bucket_contents = [obj['Key'] for obj in response['Contents']]
+                st.success("Connected to bucket. Contents:")
+                st.write(bucket_contents)
+            else:
+                st.success("Connected to bucket. Bucket is empty.")
+        except ClientError as e:
+            st.error(f"Error connecting to bucket: {e}")
+        except Exception as e:
+            st.error(f"Error connecting to bucket: {e}")
+    else:
+        st.warning("AWS credentials are not available.")
+    # --- End S3 Bucket Access Check ---
 
     # Initialize the chat messages in the session state if it doesn't exist
     if "messages" not in st.session_state:

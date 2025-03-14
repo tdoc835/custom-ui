@@ -28,6 +28,76 @@ def clear_chat_history():
     st.session_state["conversationId"] = ""
     st.session_state["parentMessageId"] = ""
 
+# Add this to your existing Streamlit app
+def file_upload_component(jwt_token):
+    """Custom Streamlit component for Uppy file uploads"""
+    component_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <link href="https://releases.transloadit.com/uppy/v3.8.0/uppy.min.css" rel="stylesheet">
+        <style>
+            .dashboard-container {{
+                background: white;
+                border-radius: 10px;
+                padding: 20px;
+                margin: 20px 0;
+            }}
+            .uppy-Dashboard-note {{
+                color: #333 !important;
+                font-size: 1.2rem !important;
+            }}
+        </style>
+    </head>
+    <body>
+        <div id="uppy-dashboard"></div>
+        
+        <script src="https://releases.transloadit.com/uppy/v3.8.0/uppy.min.js"></script>
+        <script>
+            const uppy = new Uppy.Core({{
+                restrictions: {{
+                    maxFileSize: null,
+                    maxNumberOfFiles: 1000,
+                    allowedFileTypes: [
+                        'application/pdf',
+                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ],
+                }},
+                autoProceed: false,
+            }})
+            .use(Uppy.Dashboard, {{
+                inline: true,
+                target: '#uppy-dashboard',
+                showProgressDetails: true,
+                proudlyDisplayPoweredBy: false,
+                note: 'Drop files here',
+                hideUploadButton: false,
+                disableLocalFiles: true,
+            }})
+            .use(Uppy.Tus, {{
+                endpoint: 'http://34.229.46.201:8080/files/',
+                headers: {{
+                    'Authorization': 'Bearer {jwt_token}'
+                }}
+            }});
+
+            // Handle upload completion
+            uppy.on('complete', (result) => {{
+                parent.postMessage({{
+                    type: 'uploadComplete',
+                    successful: result.successful,
+                    failed: result.failed
+                }}, '*');
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    
+    return components.v1.html(component_html, height=500)
+
 
 oauth2 = utils.configure_oauth_component()
 if "token" not in st.session_state:
@@ -78,60 +148,19 @@ else:
     with col2:
         st.button("Clear Chat History", on_click=clear_chat_history)
 
-st.write("### Upload File to S3")
-
-# Let the user choose a file to upload
-uploaded_file = st.file_uploader("Choose a file to upload")
-
-if uploaded_file:
-    # Calculate file size for progress reporting
-    file_size = len(uploaded_file.getbuffer())
-    progress_bar = st.progress(0)
-
-    # Create a callback class that updates the progress bar
-    class ProgressPercentage:
-        def __init__(self, total_size):
-            self._total_size = total_size
-            self._seen_so_far = 0
-
-        def __call__(self, bytes_amount):
-            self._seen_so_far += bytes_amount
-            percentage = int((self._seen_so_far / self._total_size) * 100)
-            progress_bar.progress(min(100, percentage))
-
-    progress = ProgressPercentage(file_size)
-
-    if st.button("Upload File"):
-        # Ensure AWS credentials are available.
-        if not st.session_state.get("aws_credentials"):
-            if "idc_jwt_token" in st.session_state:
-                # This call will assume the role and populate st.session_state.aws_credentials
-                utils.assume_role_with_token(st.session_state["idc_jwt_token"]["idToken"])
-            else:
-                st.error("No identity token available. Please log in first.")
-                st.stop()
-        try:
-            # Create the S3 client using the assumed role credentials.
-            s3_client = boto3.client(
-                's3',
-                region_name='us-east-1',
-                aws_access_key_id=st.session_state.aws_credentials.get('AccessKeyId'),
-                aws_secret_access_key=st.session_state.aws_credentials.get('SecretAccessKey'),
-                aws_session_token=st.session_state.aws_credentials.get('SessionToken')
-            )
-            # Ensure the file pointer is at the beginning
-            uploaded_file.seek(0)
-            s3_client.upload_fileobj(
-                Fileobj=uploaded_file,
-                Bucket="luminaitestbucket",
-                Key=uploaded_file.name,
-                Callback=progress
-            )
-            st.success("Upload complete!")
-        except ClientError as e:
-            st.error(f"Error uploading file: {e}")
-        except Exception as e:
-            st.error(f"Error uploading file: {e}")
+        # ======== ADD FILE UPLOADER HERE ========
+    st.header("File Upload")
+    id_token = st.session_state.token["id_token"]
+    file_upload_component(id_token)
+    
+    # Handle upload status
+    if "upload_status" not in st.session_state:
+        st.session_state.upload_status = None
+        
+    if st.session_state.upload_status:
+        success_count = len(st.session_state.upload_status.get('successful', []))
+        st.success(f"Successfully uploaded {success_count} files!")
+    # ======== END FILE UPLOAD SECTION ========
 
     # Initialize the chat messages in the session state if it doesn't exist
     if "messages" not in st.session_state:

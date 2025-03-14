@@ -7,7 +7,7 @@ import utils
 from streamlit_feedback import streamlit_feedback
 import boto3
 from botocore.exceptions import ClientError
-from streamlit import components 
+import streamlit.components.v1 as components
 
 UTC = timezone.utc
 

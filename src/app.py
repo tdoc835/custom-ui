@@ -7,12 +7,6 @@ import utils
 from streamlit_feedback import streamlit_feedback
 import streamlit.components.v1 as components
 
-
-iframe_html = """
-    <iframe src="https://buw2edkg.chat.qbusiness.us-east-1.on.aws/" width="100%" height="400" frameborder="0"></iframe>
-"""
-components.html(iframe_html, height=400)
-
 UTC=timezone.utc
 
 # Init configuration
@@ -22,6 +16,11 @@ if "aws_credentials" not in st.session_state:
 
 st.set_page_config(page_title="Luminai App") #HTML title
 st.title("Luminai App") #page title
+
+iframe_html = """
+    <iframe src="https://buw2edkg.chat.qbusiness.us-east-1.on.aws/" width="100%" height="400" frameborder="0"></iframe>
+"""
+components.html(iframe_html, height=400)
 
 # Define a function to clear the chat history
 def clear_chat_history():

@@ -27,6 +27,10 @@ def clear_chat_history():
     st.session_state["conversationId"] = ""
     st.session_state["parentMessageId"] = ""
 
+iframe_html = """
+     <iframe src="https://buw2edkg.chat.qbusiness.us-east-1.on.aws/" width="100%" height="400" frameborder="0"></iframe>
+ """
+
 oauth2 = utils.configure_oauth_component()
 if "token" not in st.session_state:
     # If not, show authorize button
@@ -70,6 +74,8 @@ else:
             st.error(f"Error refreshing Identity Center token: {e}. Please reload the page.")
 
     col1, col2 = st.columns([1,1])
+    
+    components.html(iframe_html, height=400)
 
     with col1:
         st.write("Welcome: ", user_email)

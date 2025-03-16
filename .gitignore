@@ -172,3 +172,7 @@ docs/arch.drawio
 reportliner.json
 
 logs.txt
+
+redeployprocess.txt
+venv/
+.env
